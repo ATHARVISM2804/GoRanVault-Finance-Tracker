@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, DollarSign } from 'lucide-react';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from '../auth/firebase.ts';
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -8,18 +10,43 @@ const Login = () => {
     email: '',
     password: ''
   });
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      console.log(formData.email, formData.password);
+      const token = await userCredential.user.getIdToken(); 
+      localStorage.setItem('token', token); 
+      console.log("Login successful!"); 
+      navigate('/dashboard'); 
+    } catch (error) {
+      console.error("Login failed:", error);
+      alert("Invalid email or password.");
+    }
+  };
+
+  const handleGoogleSignIn = () => {
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider)
+      .then((result) => {
+        const token = result.user.getIdToken();
+        localStorage.setItem('token', token);
+        console.log("Login successful!");
+        navigate('/dashboard');
+      })
+      .catch((error) => {
+        console.error("Login failed:", error);
+        alert("Invalid email or password.");
+      }); 
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Handle login logic here
-    console.log('Login attempted with:', formData);
   };
 
   return (
@@ -53,7 +80,7 @@ const Login = () => {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-3 bg-dark-bg border border-gold/30 rounded-lg focus:ring-2 focus:ring-gold focus:border-transparent text-metal-white placeholder-metal-brown"
+                  className="w-full pl-10 pr-4 py-3 bg-dark-bg border b order-gold/30 rounded-lg focus:ring-2 focus:ring-gold focus:border-transparent text-metal-white placeholder-metal-brown"
                   placeholder="Enter your email"
                 />
               </div>
@@ -120,7 +147,8 @@ const Login = () => {
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="mt-6 grid grid-cols-1 gap-3"
+            onClick={() => handleGoogleSignIn()}>
               <button className="w-full inline-flex justify-center py-3 px-4 rounded-lg border border-gold/30 bg-dark-bg text-sm font-medium text-metal-white hover:bg-dark-card transition-colors">
                 <svg className="h-5 w-5" viewBox="0 0 24 24">
                   <path
@@ -143,12 +171,12 @@ const Login = () => {
                 <span className="ml-2">Google</span>
               </button>
 
-              <button className="w-full inline-flex justify-center py-3 px-4 rounded-lg border border-gold/30 bg-dark-bg text-sm font-medium text-metal-white hover:bg-dark-card transition-colors">
+              {/* <button className="w-full inline-flex justify-center py-3 px-4 rounded-lg border border-gold/30 bg-dark-bg text-sm font-medium text-metal-white hover:bg-dark-card transition-colors">
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
                 </svg>
                 <span className="ml-2">Twitter</span>
-              </button>
+              </button> */}
             </div>
           </div>
 
