@@ -30,6 +30,18 @@ import {
 const Dashboard = () => {
   const { user } = useAuth();
 
+  // Add budget constants
+  const MONTHLY_BUDGET = 5000;
+  const BUDGET_CATEGORIES = {
+    'Food & Dining': 1200,
+    'Shopping': 800,
+    'Transportation': 500,
+    'Entertainment': 300,
+    'Healthcare': 400,
+    'Bills & Utilities': 1000,
+    'Other': 800
+  };
+  
   const [transactions, setTransactions] = useState([]);
   const [totalBalance, setTotalBalance] = useState(0);
   const [totalIncome, setTotalIncome] = useState(0);
@@ -37,6 +49,8 @@ const Dashboard = () => {
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [monthlyExpenses, setMonthlyExpenses] = useState(0);
   const [netSavings, setNetSavings] = useState(0);
+  const [categoryExpenses, setCategoryExpenses] = useState([]);
+  const [monthlyTrendsData, setMonthlyTrendsData] = useState([]);
   const [previousMonthData, setPreviousMonthData] = useState({
     totalBalance: 0,
     monthlyIncome: 0,
@@ -51,6 +65,28 @@ const Dashboard = () => {
     type: 'expense',
     date: ''
   });
+  const [budgetCategories, setBudgetCategories] = useState([]);
+
+  const expenseCategories = [
+    'Food & Dining',
+    'Shopping',
+    'Transportation',
+    'Entertainment',
+    'Healthcare',
+    'Bills & Utilities',
+    'Education',
+    'Travel',
+    'Other'
+  ];
+
+  const incomeCategories = [
+    'Salary',
+    'Freelance',
+    'Investments',
+    'Business',
+    'Rental',
+    'Others'
+  ];
 
   const categories = ['Food & Dining', 'Shopping', 'Transportation', 'Entertainment', 'Healthcare', 'Income', 'Other'];
 
@@ -59,87 +95,112 @@ const Dashboard = () => {
       const { data } = await axios.get("http://localhost:5000/api/transactions", {
         params: { uid: user?.uid },
       });
-  
-      console.log("Transactions:", data);
+
       setTransactions(data);
-  
-      // Get current month/year in UTC to avoid timezone issues
+
+      // Get current month/year in UTC
       const now = new Date();
       const currentMonth = now.getUTCMonth();
       const currentYear = now.getUTCFullYear();
-  
-      // Initialize calculations
-      let totalBalance = 0;
-      let totalIncome = 0;
-      let totalExpenses = 0;
-      let monthlyIncome = 0;
-      let monthlyExpenses = 0;
-      let previousMonthIncome = 0;
-      let previousMonthExpenses = 0;
-  
-      data.forEach(transaction => {
-        const transactionDate = new Date(transaction.date);
-        const amount = Number(transaction.amount);
-        
-        // Update running totals
-        totalBalance += amount;
-        
-        if (amount > 0) {
-          totalIncome += amount;
-        } else {
-          totalExpenses += Math.abs(amount);
-        }
 
-        // Check if transaction is from current month
-        const isCurrentMonth = 
-          transactionDate.getUTCMonth() === currentMonth && 
-          transactionDate.getUTCFullYear() === currentYear;
-  
-        // Check if transaction is from previous month
-        const isPreviousMonth = 
-          (transactionDate.getUTCMonth() === (currentMonth === 0 ? 11 : currentMonth - 1)) &&
-          transactionDate.getUTCFullYear() === (currentMonth === 0 ? currentYear - 1 : currentYear);
-  
-        if (amount > 0) {
-          if (isCurrentMonth) monthlyIncome += amount;
-          if (isPreviousMonth) previousMonthIncome += amount;
+      // Initialize monthly data tracking
+      let monthlyData = Array(12).fill().map(() => ({
+        income: 0,
+        expenses: 0
+      }));
+
+      // Initialize category tracking
+      let categories = {};
+      
+      let finances = {
+        totalBalance: 0,
+        totalIncome: 0,
+        totalExpenses: 0,
+        monthlyIncome: 0,
+        monthlyExpenses: 0,
+        previousMonthIncome: 0,
+        previousMonthExpenses: 0
+      };
+
+      data.forEach(transaction => {
+        const amount = Number(transaction.amount);
+        const date = new Date(transaction.date);
+        const transactionMonth = date.getUTCMonth();
+        const transactionYear = date.getUTCFullYear();
+
+        // Update based on transaction type
+        if (transaction.type === 'income') {
+          // Income handling - use positive values
+          finances.totalBalance += amount;
+          finances.totalIncome += amount;
+          
+          if (transactionMonth === currentMonth && transactionYear === currentYear) {
+            finances.monthlyIncome += amount;
+            monthlyData[transactionMonth].income += amount;
+          } else if (transactionMonth === (currentMonth === 0 ? 11 : currentMonth - 1) &&
+                    transactionYear === (currentMonth === 0 ? currentYear - 1 : currentYear)) {
+            finances.previousMonthIncome += amount;
+          }
         } else {
-          const absoluteAmount = Math.abs(amount);
-          if (isCurrentMonth) monthlyExpenses += absoluteAmount;
-          if (isPreviousMonth) previousMonthExpenses += absoluteAmount;
+          
+          finances.totalBalance -= amount; 
+          finances.totalExpenses += Math.abs(amount);
+          
+          if (transaction.category) {
+            categories[transaction.category] = (categories[transaction.category] || 0) + Math.abs(amount);
+          }
+
+          if (transactionMonth === currentMonth && transactionYear === currentYear) {
+            finances.monthlyExpenses += Math.abs(amount);
+            monthlyData[transactionMonth].expenses += Math.abs(amount);
+          } else if (transactionMonth === (currentMonth === 0 ? 11 : currentMonth - 1) &&
+                    transactionYear === (currentMonth === 0 ? currentYear - 1 : currentYear)) {
+            finances.previousMonthExpenses += Math.abs(amount);
+          }
         }
       });
-  
-      // Calculate metrics
-      const netSavings = monthlyIncome - monthlyExpenses;
-      const previousMonthNetSavings = previousMonthIncome - previousMonthExpenses;
-  
-      // Update previous month data
+
+      // Calculate category percentages
+      const categoryData = Object.entries(categories).map(([name, value]) => ({
+        name,
+        value,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)]
+      })).sort((a, b) => b.value - a.value);
+
+      // Format monthly trends data
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const trendsData = monthlyData.map((data, index) => ({
+        month: monthNames[index],
+        income: data.income,
+        expenses: data.expenses
+      }));
+
+      // Calculate budget status for each category
+      const budgetStatus = Object.entries(categories).map(([name, spent]) => ({
+        name,
+        spent,
+        budget: BUDGET_CATEGORIES[name] || MONTHLY_BUDGET * 0.1, // Default 10% if category not defined
+        color: COLORS[Math.floor(Math.random() * COLORS.length)]
+      })).sort((a, b) => b.spent - a.spent);
+
+      setBudgetCategories(budgetStatus);
+
+      // Update all state values
+      setTotalBalance(finances.totalBalance);
+      setTotalIncome(finances.totalIncome);
+      setTotalExpenses(finances.totalExpenses);
+      setMonthlyIncome(finances.monthlyIncome);
+      setMonthlyExpenses(finances.monthlyExpenses);
+      setNetSavings(finances.monthlyIncome - finances.monthlyExpenses);
+      setCategoryExpenses(categoryData);
+      setMonthlyTrendsData(trendsData);
       setPreviousMonthData({
-        totalBalance,
-        monthlyIncome: previousMonthIncome,
-        monthlyExpenses: previousMonthExpenses,
-        netSavings: previousMonthNetSavings
+        totalBalance: finances.totalBalance,
+        monthlyIncome: finances.previousMonthIncome,
+        monthlyExpenses: finances.previousMonthExpenses,
+        netSavings: finances.previousMonthIncome - finances.previousMonthExpenses
       });
-  
-      // Update current values
-      setTotalBalance(totalBalance);
-      setTotalIncome(totalIncome);
-      setTotalExpenses(totalExpenses);
-      setMonthlyIncome(monthlyIncome);
-      setMonthlyExpenses(monthlyExpenses);
-      setNetSavings(netSavings);
-  
-      console.log("Financial Calculations:", {
-        totalBalance,
-        monthlyIncome,
-        monthlyExpenses,
-        netSavings,
-        previousMonthIncome,
-        previousMonthExpenses,
-        previousMonthNetSavings
-      });
-  
+
     } catch (err) {
       console.error("Error fetching transactions:", err);
     }
@@ -163,15 +224,14 @@ const Dashboard = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Convert amount to negative if it's an expense
-      const amount = formData.type === 'expense' 
-        ? -Math.abs(Number(formData.amount))
-        : Math.abs(Number(formData.amount));
+      // Fixed: Only apply negative for expenses, keep income positive
+      const amount = Number(formData.amount);
+      const finalAmount = formData.type === 'expense' ? -Math.abs(amount) : Math.abs(amount);
 
       // Add transaction to the database
       await axios.post("http://localhost:5000/api/transactions", {
         ...formData,
-        amount,
+        amount: finalAmount,
         uid: user?.uid
       });
 
@@ -198,29 +258,8 @@ const Dashboard = () => {
     }
   }, [user]);
 
-  const expenseData = [
-    { name: 'Food & Dining', value: 50, color: '#d4af37' },
-    { name: 'Shopping', value: 25, color: '#f4e4a6' },
-    { name: 'Transportation', value: 20, color: '#8b7355' },
-    { name: 'Entertainment', value: 12, color: '#b8941f' },
-    { name: 'Healthcare', value: 8, color: '#e8e8e8' },
-  ];
-
-  const monthlyTrends = [
-    { month: 'Jan', income: 5000, expenses: 3500 },
-    { month: 'Feb', income: 5200, expenses: 3800 },
-    { month: 'Mar', income: 4800, expenses: 3200 },
-    { month: 'Apr', income: 5500, expenses: 4100 },
-    { month: 'May', income: 5300, expenses: 3900 },
-    { month: 'Jun', income: 5700, expenses: 4200 },
-  ];
-
-  const budgetCategories = [
-    { name: 'Food & Dining', spent: 850, budget: 1200, color: '#d4af37' },
-    { name: 'Shopping', spent: 450, budget: 800, color: '#f4e4a6' },
-    { name: 'Transportation', spent: 320, budget: 500, color: '#8b7355' },
-    { name: 'Entertainment', spent: 180, budget: 300, color: '#b8941f' },
-  ];
+  const expenseData = categoryExpenses;
+  const monthlyTrends = monthlyTrendsData;
 
   const COLORS = ['#d4af37', '#f4e4a6', '#8b7355', '#b8941f', '#e8e8e8'];
 
@@ -239,6 +278,11 @@ const Dashboard = () => {
         {percentage}%
       </span>
     );
+  };
+
+  // Add this helper function
+  const getCategories = (type: string) => {
+    return type === 'income' ? incomeCategories : expenseCategories;
   };
 
   return (
@@ -268,15 +312,15 @@ const Dashboard = () => {
                 <DollarSign className="h-5 w-5" />
                 <span className="font-medium">Dashboard</span>
               </a>
-              <a href="#" className="flex items-center space-x-3 px-4 py-3 rounded-xl text-metal-white/70 hover:bg-gold/5 hover:text-gold transition-all duration-300 group">
+              <a href="/expense-tracker" className="flex items-center space-x-3 px-4 py-3 rounded-xl text-metal-white/70 hover:bg-gold/5 hover:text-gold transition-all duration-300 group">
                 <Receipt className="h-5 w-5 group-hover:scale-110 transition-transform" />
                 <span>Transactions</span>
               </a>
-              <a href="#" className="flex items-center space-x-3 px-4 py-3 rounded-xl text-metal-white/70 hover:bg-gold/5 hover:text-gold transition-all duration-300 group">
+              <a href="/budget" className="flex items-center space-x-3 px-4 py-3 rounded-xl text-metal-white/70 hover:bg-gold/5 hover:text-gold transition-all duration-300 group">
                 <Wallet className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                <span>Budgets</span>
+                <span>Budget</span>
               </a>
-              <a href="#" className="flex items-center space-x-3 px-4 py-3 rounded-xl text-metal-white/70 hover:bg-gold/5 hover:text-gold transition-all duration-300 group">
+              <a href="/goals" className="flex items-center space-x-3 px-4 py-3 rounded-xl text-metal-white/70 hover:bg-gold/5 hover:text-gold transition-all duration-300 group">
                 <Target className="h-5 w-5 group-hover:scale-110 transition-transform" />
                 <span>Goals</span>
               </a>
@@ -327,7 +371,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-metal-white/60 text-sm font-medium">Total Balance</p>
-                  <p className="text-3xl font-bold text-metal-white mt-1">${totalBalance.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-metal-white mt-1">₹{totalBalance.toFixed(2)}</p>
                   {renderPercentageChange(totalBalance, previousMonthData.totalBalance)}
                 </div>
                 <div className="bg-gold/20 p-4 rounded-xl border border-gold/30">
@@ -341,7 +385,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-metal-white/60 text-sm font-medium">Monthly Income</p>
-                  <p className="text-3xl font-bold text-metal-white mt-1">${monthlyIncome.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-metal-white mt-1">₹{monthlyIncome.toFixed(2)}</p>
                   {renderPercentageChange(monthlyIncome, previousMonthData.monthlyIncome)}
                 </div>
                 <div className="bg-green-500/20 p-4 rounded-xl border border-green-500/30">
@@ -355,7 +399,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-metal-white/60 text-sm font-medium">Monthly Expenses</p>
-                  <p className="text-3xl font-bold text-metal-white mt-1">${monthlyExpenses.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-metal-white mt-1">₹{monthlyExpenses.toFixed(2)}</p>
                   {renderPercentageChange(monthlyExpenses, previousMonthData.monthlyExpenses)}
                 </div>
                 <div className="bg-red-500/20 p-4 rounded-xl border border-red-500/30">
@@ -369,7 +413,7 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-metal-white/60 text-sm font-medium">Net Savings</p>
-                  <p className="text-3xl font-bold text-metal-white mt-1">${netSavings.toFixed(2)}</p>
+                  <p className="text-3xl font-bold text-metal-white mt-1">₹{netSavings.toFixed(2)}</p>
                   {renderPercentageChange(netSavings, previousMonthData.netSavings)}
                 </div>
                 <div className="bg-gold/20 p-4 rounded-xl border border-gold/30">
@@ -465,7 +509,7 @@ const Dashboard = () => {
             <div className="lg:col-span-2 dark-card p-8 rounded-xl border border-gold/20">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-semibold text-metal-white">Recent Transactions</h3>
-                <button className="text-gold hover:text-gold-light text-sm font-medium">View All</button>
+                <button onClick={() => {window.location.href = '/expense-tracker'}} className="text-gold hover:text-gold-light text-sm font-medium">View All</button>
               </div>
               <div className="space-y-4">
                 {transactions.length > 0 ? (
@@ -473,12 +517,12 @@ const Dashboard = () => {
                     <div key={transaction._id || transaction.id} className="flex items-center justify-between p-4 bg-dark-bg/50 rounded-xl border border-gold/10 hover:border-gold/30 transition-all">
                       <div className="flex items-center space-x-4">
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                          transaction.amount > 0 ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30'
+                          transaction.type === 'income' ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30'
                         }`}>
-                          {transaction.amount > 0 ? (
+                          {transaction.type === 'income' ? (
                             <TrendingUp className="h-6 w-6 text-green-400" />
                           ) : (
-                            <CreditCard className="h-6 w-6 text-red-400" />
+                            <TrendingDown className="h-6 w-6 text-red-400" />
                           )}
                         </div>
                         <div>
@@ -488,9 +532,9 @@ const Dashboard = () => {
                       </div>
                       <div className="text-right">
                         <p className={`font-bold text-lg ${
-                          transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
+                          transaction.type === 'income' ? 'text-green-400' : 'text-red-400'
                         }`}>
-                          {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toFixed(2)}
+                          {transaction.type === 'income' ? '+' : '-'}₹{Math.abs(Number(transaction.amount)).toFixed(2)}
                         </p>
                         <p className="text-metal-white/60 text-sm">
                           {new Date(transaction.date).toLocaleDateString()}
@@ -508,29 +552,33 @@ const Dashboard = () => {
             <div className="dark-card p-8 rounded-xl border border-gold/20">
               <h3 className="text-2xl font-semibold mb-6 text-metal-white">Budget Status</h3>
               <div className="space-y-6">
-                {budgetCategories.map((category, index) => (
-                  <div key={index} className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-metal-white font-medium">{category.name}</span>
-                      <span className="text-metal-white/60 text-sm">${category.spent}/${category.budget}</span>
+                {budgetCategories.length > 0 ? (
+                  budgetCategories.map((category, index) => (
+                    <div key={index} className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-metal-white font-medium">{category.name}</span>
+                        <span className="text-metal-white/60 text-sm">₹{category.spent.toFixed(2)}/₹{category.budget.toFixed(2)}</span>
+                      </div>
+                      <div className="w-full bg-dark-bg rounded-full h-3 border border-gold/20">
+                        <div
+                          className="h-3 rounded-full transition-all duration-500 shadow-lg"
+                          style={{
+                            width: `${Math.min((category.spent / category.budget) * 100, 100)}%`,
+                            backgroundColor: category.color,
+                            boxShadow: `0 0 10px ${category.color}40`
+                          }}
+                        />
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs text-metal-white/60">
+                          {Math.min((category.spent / category.budget) * 100, 100).toFixed(1)}% used
+                        </span>
+                      </div>
                     </div>
-                    <div className="w-full bg-dark-bg rounded-full h-3 border border-gold/20">
-                      <div
-                        className="h-3 rounded-full transition-all duration-500 shadow-lg"
-                        style={{
-                          width: `${(category.spent / category.budget) * 100}%`,
-                          backgroundColor: category.color,
-                          boxShadow: `0 0 10px ${category.color}40`
-                        }}
-                      />
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs text-metal-white/60">
-                        {((category.spent / category.budget) * 100).toFixed(1)}% used
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-metal-white/60 text-center py-8">No budget data available</p>
+                )}
               </div>
             </div>
           </div>
@@ -633,7 +681,7 @@ const Dashboard = () => {
                       className="w-full pl-12 pr-4 py-4 bg-dark-bg border border-gold/30 rounded-xl focus:ring-2 focus:ring-gold focus:border-transparent text-metal-white text-lg"
                     >
                       <option value="">Select category</option>
-                      {categories.map(category => (
+                      {getCategories(formData.type).map(category => (
                         <option key={category} value={category}>{category}</option>
                       ))}
                     </select>

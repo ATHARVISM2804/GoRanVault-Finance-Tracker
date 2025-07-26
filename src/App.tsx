@@ -10,6 +10,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import ExpenseTracker from './pages/ExpenseTracker';
 import ProtectedRoute from './auth/ProtectedRoute';
+import Budget from './pages/Budget';
+import { Goal } from 'lucide-react';
 
 function App() {
   return (
@@ -21,6 +23,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/features" element={<Features />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/budget" element={<Budget />} />
+            <Route path="/goals" element={<Goal />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
