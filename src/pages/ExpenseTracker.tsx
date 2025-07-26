@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
 import { Plus, Filter, Search, Calendar, DollarSign, Tag, FileText, Trash2, Edit, TrendingUp, TrendingDown, Eye, Grid, List } from 'lucide-react';
 
+import axios from 'axios';
+import { useAuth } from '../auth/AuthContext';
+
 const ExpenseTracker = () => {
+  const { user } = useAuth();
   const [showAddForm, setShowAddForm] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
   const [filterCategory, setFilterCategory] = useState('all');
   const [dateRange, setDateRange] = useState('this-month');
-  
+
   const [formData, setFormData] = useState({
     amount: '',
     category: '',
     description: '',
+    type: 'expense',
     date: new Date().toISOString().split('T')[0],
   });
 
@@ -26,21 +31,30 @@ const ExpenseTracker = () => {
     'Other'
   ];
 
-  const expenses = [
-    { id: 1, amount: 85.50, category: 'Food & Dining', description: 'Grocery Store', date: '2025-01-15', type: 'expense' },
-    { id: 2, amount: 12.80, category: 'Food & Dining', description: 'Coffee Shop', date: '2025-01-14', type: 'expense' },
-    { id: 3, amount: 45.00, category: 'Transportation', description: 'Gas Station', date: '2025-01-14', type: 'expense' },
-    { id: 4, amount: 156.99, category: 'Shopping', description: 'Online Shopping', date: '2025-01-13', type: 'expense' },
-    { id: 5, amount: 89.95, category: 'Entertainment', description: 'Movie Theater', date: '2025-01-12', type: 'expense' },
-    { id: 6, amount: 120.00, category: 'Bills & Utilities', description: 'Electric Bill', date: '2025-01-10', type: 'expense' },
-    { id: 7, amount: 5500.00, category: 'Income', description: 'Salary', date: '2025-01-01', type: 'income' },
-  ];
+
+  const [expense, setExpense] = useState([]);
+
+  axios.get('http://localhost:5000/api/transactions', {
+    params: {
+      uid: user?.uid
+    }
+  }).then(res => setExpense(res.data))
+    .then(res => console.log("Transactions:", res))
+    .catch(err => console.error("Error:", err));
+
+  const expenses = expense;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('New expense:', formData);
-    setShowAddForm(false);
-    setFormData({ amount: '', category: '', description: '', date: new Date().toISOString().split('T')[0] });
+    axios.post('http://localhost:5000/api/transactions', {
+      uid: user?.uid,
+      ...formData
+    })
+      .then(res => {
+        console.log("Expense Added:", res.data);
+        setShowAddForm(false);
+      })
+      .catch(err => console.error("Error:", err));
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -49,6 +63,14 @@ const ExpenseTracker = () => {
       [e.target.name]: e.target.value
     });
   };
+
+  const handleDelete = (id: string) => {
+    axios.delete(`http://localhost:5000/api/transactions/${id}`)
+      .then(res => {
+        console.log("Expense Deleted:", res.data);  
+      })
+      .catch(err => console.error("Error:", err));
+  };  
 
   const filteredExpenses = expenses.filter(expense => {
     if (filterCategory === 'all') return true;
@@ -141,7 +163,7 @@ const ExpenseTracker = () => {
               <Filter className="h-6 w-6 text-gold" />
               <span className="text-metal-white font-semibold text-lg">Filters & View</span>
             </div>
-            
+
             <div className="flex flex-wrap gap-4 items-center flex-1">
               <select
                 value={filterCategory}
@@ -168,21 +190,19 @@ const ExpenseTracker = () => {
               <div className="flex items-center space-x-2 ml-auto">
                 <button
                   onClick={() => setViewMode('table')}
-                  className={`p-3 rounded-xl transition-all ${
-                    viewMode === 'table' 
-                      ? 'bg-gold text-dark-bg shadow-lg shadow-gold/30' 
-                      : 'bg-dark-bg text-metal-white/70 hover:bg-gold/10 hover:text-gold border border-gold/30'
-                  }`}
+                  className={`p-3 rounded-xl transition-all ${viewMode === 'table'
+                    ? 'bg-gold text-dark-bg shadow-lg shadow-gold/30'
+                    : 'bg-dark-bg text-metal-white/70 hover:bg-gold/10 hover:text-gold border border-gold/30'
+                    }`}
                 >
                   <List className="h-5 w-5" />
                 </button>
                 <button
                   onClick={() => setViewMode('cards')}
-                  className={`p-3 rounded-xl transition-all ${
-                    viewMode === 'cards' 
-                      ? 'bg-gold text-dark-bg shadow-lg shadow-gold/30' 
-                      : 'bg-dark-bg text-metal-white/70 hover:bg-gold/10 hover:text-gold border border-gold/30'
-                  }`}
+                  className={`p-3 rounded-xl transition-all ${viewMode === 'cards'
+                    ? 'bg-gold text-dark-bg shadow-lg shadow-gold/30'
+                    : 'bg-dark-bg text-metal-white/70 hover:bg-gold/10 hover:text-gold border border-gold/30'
+                    }`}
                 >
                   <Grid className="h-5 w-5" />
                 </button>
@@ -220,14 +240,12 @@ const ExpenseTracker = () => {
                     <tr key={expense.id} className="hover:bg-gold/5 transition-all duration-300">
                       <td className="px-8 py-6 whitespace-nowrap">
                         <div className="flex items-center space-x-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
-                            expense.type === 'income' 
-                              ? 'bg-green-500/20 border-green-500/30' 
-                              : 'bg-red-500/20 border-red-500/30'
-                          }`}>
-                            <DollarSign className={`h-6 w-6 ${
-                              expense.type === 'income' ? 'text-green-400' : 'text-red-400'
-                            }`} />
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${expense.type === 'income'
+                            ? 'bg-green-500/20 border-green-500/30'
+                            : 'bg-red-500/20 border-red-500/30'
+                            }`}>
+                            <DollarSign className={`h-6 w-6 ${expense.type === 'income' ? 'text-green-400' : 'text-red-400'
+                              }`} />
                           </div>
                           <span className="text-metal-white font-semibold text-lg">{expense.description}</span>
                         </div>
@@ -241,9 +259,8 @@ const ExpenseTracker = () => {
                         {expense.date}
                       </td>
                       <td className="px-8 py-6 whitespace-nowrap">
-                        <span className={`font-bold text-xl ${
-                          expense.type === 'income' ? 'text-green-400' : 'text-red-400'
-                        }`}>
+                        <span className={`font-bold text-xl ${expense.type === 'income' ? 'text-green-400' : 'text-red-400'
+                          }`}>
                           {expense.type === 'income' ? '+' : '-'}${expense.amount.toFixed(2)}
                         </span>
                       </td>
@@ -252,7 +269,9 @@ const ExpenseTracker = () => {
                           <button className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all">
                             <Edit className="h-5 w-5" />
                           </button>
-                          <button className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all">
+                          <button 
+                          onClick={() => handleDelete(expense.id)}
+                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all">
                             <Trash2 className="h-5 w-5" />
                           </button>
                         </div>
@@ -267,14 +286,12 @@ const ExpenseTracker = () => {
               {filteredExpenses.map((expense) => (
                 <div key={expense.id} className="bg-dark-bg/50 p-6 rounded-xl border border-gold/20 hover:border-gold/40 transition-all duration-300 hover-glow">
                   <div className="flex items-center justify-between mb-4">
-                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center border ${
-                      expense.type === 'income' 
-                        ? 'bg-green-500/20 border-green-500/30' 
-                        : 'bg-red-500/20 border-red-500/30'
-                    }`}>
-                      <DollarSign className={`h-7 w-7 ${
-                        expense.type === 'income' ? 'text-green-400' : 'text-red-400'
-                      }`} />
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center border ${expense.type === 'income'
+                      ? 'bg-green-500/20 border-green-500/30'
+                      : 'bg-red-500/20 border-red-500/30'
+                      }`}>
+                      <DollarSign className={`h-7 w-7 ${expense.type === 'income' ? 'text-green-400' : 'text-red-400'
+                        }`} />
                     </div>
                     <div className="flex items-center space-x-2">
                       <button className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all">
@@ -288,9 +305,8 @@ const ExpenseTracker = () => {
                   <h3 className="text-metal-white font-semibold text-lg mb-3">{expense.description}</h3>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-metal-white/60 text-sm">{expense.category}</span>
-                    <span className={`font-bold text-lg ${
-                      expense.type === 'income' ? 'text-green-400' : 'text-red-400'
-                    }`}>
+                    <span className={`font-bold text-lg ${expense.type === 'income' ? 'text-green-400' : 'text-red-400'
+                      }`}>
                       {expense.type === 'income' ? '+' : '-'}${expense.amount.toFixed(2)}
                     </span>
                   </div>
@@ -343,6 +359,26 @@ const ExpenseTracker = () => {
                       {categories.map(category => (
                         <option key={category} value={category}>{category}</option>
                       ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-metal-white mb-3">
+                    Type
+                  </label>
+                  <div className="relative">
+                    <Tag className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gold" />
+                    <select
+                      name="type"
+                      required
+                      value={formData.type}
+                      onChange={handleInputChange}
+                      className="w-full pl-12 pr-4 py-4 bg-dark-bg border border-gold/30 rounded-xl focus:ring-2 focus:ring-gold focus:border-transparent text-metal-white text-lg"
+                    >
+                      <option value="">Select type</option>
+                      <option value="expense">Expense</option>
+                      <option value="income">Income</option>
                     </select>
                   </div>
                 </div>

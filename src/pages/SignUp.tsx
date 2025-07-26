@@ -44,16 +44,16 @@ const SignUp = () => {
   
       console.log("Signup successful!");
 
-      await axios.post(
-        "/api/users",
-        { name, email },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
+      // await axios.post(
+      //   "/api/users",
+      //   { name, email },
+      //   {
+      //     headers: {
+      //       Authorization: `Bearer ${token}`,
+      //       "Content-Type": "application/json"
+      //     }
+      //   }
+      // );
       navigate("/dashboard"); // redirect after signup
     } catch (error) {
       console.error("Signup failed:", error);
